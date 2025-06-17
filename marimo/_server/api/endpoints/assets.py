@@ -130,14 +130,32 @@ def _inject_service_worker(html: str, file_key: str) -> str:
                 const notebookId = '{uri_encode_component(file_key)}';
                 navigator.serviceWorker.register('./public-files-sw.js?v=2')
                     .then(registration => {{
-                        registration.active.postMessage({{ notebookId }});
+                        if (registration.active) {{
+                            registration.active.postMessage({{ notebookId }});
+                        }} else {{
+                            // Wait for service worker to become active
+                            registration.addEventListener('updatefound', () => {{
+                                const newWorker = registration.installing;
+                                if (newWorker) {{
+                                    newWorker.addEventListener('statechange', () => {{
+                                        if (newWorker.state === 'activated') {{
+                                            newWorker.postMessage({{ notebookId }});
+                                        }}
+                                    }});
+                                }}
+                            }});
+                        }}
                     }})
                     .catch(error => {{
                         console.error('Error registering service worker:', error);
                     }});
                 navigator.serviceWorker.ready
                     .then(registration => {{
-                        registration.update().then(() => registration.active.postMessage({{ notebookId }}));
+                        registration.update().then(() => {{
+                            if (registration.active) {{
+                                registration.active.postMessage({{ notebookId }});
+                            }}
+                        }});
                     }})
                     .catch(error => {{
                         console.error('Error updating service worker:', error);
